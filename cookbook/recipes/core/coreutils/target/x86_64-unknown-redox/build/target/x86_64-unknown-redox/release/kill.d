@@ -1,0 +1,1 @@
+/mnt/redox/cookbook/recipes/core/coreutils/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/kill: /mnt/redox/cookbook/recipes/core/coreutils/source/src/bin/kill.rs /mnt/redox/cookbook/recipes/core/coreutils/source/src/lib.rs

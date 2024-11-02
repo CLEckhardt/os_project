@@ -1,0 +1,1 @@
+/mnt/redox/cookbook/recipes/core/audiod/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/audiod: /mnt/redox/cookbook/recipes/core/audiod/source/src/main.rs /mnt/redox/cookbook/recipes/core/audiod/source/src/scheme.rs

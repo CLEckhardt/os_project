@@ -1,0 +1,1175 @@
+     1                                  sectalign off
+     2                                  
+     3                                  ; stage 1 is sector 0, loaded at 0x7C00
+     4                                  %include "stage1.asm"
+     1                              <1> ORG 0x7C00
+     2                              <1> SECTION .text
+     3                              <1> USE16
+     4                              <1> 
+     5                              <1> stage1: ; dl comes with disk
+     6                              <1>     ; initialize segment registers
+     7 00000000 31C0                <1>     xor ax, ax
+     8 00000002 8ED8                <1>     mov ds, ax
+     9 00000004 8EC0                <1>     mov es, ax
+    10 00000006 8ED0                <1>     mov ss, ax
+    11                              <1> 
+    12                              <1>     ; initialize stack
+    13 00000008 BC007C              <1>     mov sp, 0x7C00
+    14                              <1> 
+    15                              <1>     ; initialize CS
+    16 0000000B 50                  <1>     push ax
+    17 0000000C 68[1000]            <1>     push word .set_cs
+    18 0000000F CB                  <1>     retf
+    19                              <1> 
+    20                              <1> .set_cs:
+    21                              <1> 
+    22                              <1>     ; save disk number
+    23 00000010 8816[A101]          <1>     mov [disk], dl
+    24                              <1> 
+    25 00000014 BE[9401]            <1>     mov si, stage_msg
+    26 00000017 E84901              <1>     call print
+    27 0000001A B031                <1>     mov al, '1'
+    28 0000001C E85201              <1>     call print_char
+    29 0000001F E83801              <1>     call print_line
+    30                              <1> 
+    31                              <1>     ; read CHS gemotry
+    32                              <1>     ;  CL (bits 0-5) = maximum sector number
+    33                              <1>     ;  CL (bits 6-7) = high bits of max cylinder number
+    34                              <1>     ;  CH = low bits of maximum cylinder number
+    35                              <1>     ;  DH = maximum head number
+    36 00000022 B408                <1>     mov ah, 0x08
+    37 00000024 8A16[A101]          <1>     mov dl, [disk]
+    38 00000028 31FF                <1>     xor di, di
+    39 0000002A CD13                <1>     int 0x13
+    40 0000002C 0F820E01            <1>     jc error ; carry flag set on error
+    41 00000030 88EB                <1>     mov bl, ch
+    42 00000032 88CF                <1>     mov bh, cl
+    43 00000034 C0EF06              <1>     shr bh, 6
+    44 00000037 891E[A201]          <1>     mov [chs.c], bx
+    45 0000003B C1EA08              <1>     shr dx, 8
+    46 0000003E 42                  <1>     inc dx ; returns heads - 1
+    47 0000003F 8916[A601]          <1>     mov [chs.h], dx
+    48 00000043 80E13F              <1>     and cl, 0x3f
+    49 00000046 880E[AA01]          <1>     mov [chs.s], cl
+    50                              <1> 
+    51 0000004A 66B822000000        <1>     mov eax, (stage2 - stage1) / 512
+    52 00000050 BB[0044]            <1>     mov bx, stage2
+    53 00000053 B9FB01              <1>     mov cx, (stage3.end - stage2) / 512
+    54 00000056 BA0000              <1>     mov dx, 0
+    55 00000059 E81100              <1>     call load
+    56                              <1> 
+    57 0000005C BE[9401]            <1>     mov si, stage_msg
+    58 0000005F E80101              <1>     call print
+    59 00000062 B032                <1>     mov al, '2'
+    60 00000064 E80A01              <1>     call print_char
+    61 00000067 E8F000              <1>     call print_line
+    62                              <1> 
+    63 0000006A E99343              <1>     jmp stage2.entry
+    64                              <1> 
+    65                              <1> ; load some sectors from disk to a buffer in memory
+    66                              <1> ; buffer has to be below 1MiB
+    67                              <1> ; IN
+    68                              <1> ;   ax: start sector
+    69                              <1> ;   bx: offset of buffer
+    70                              <1> ;   cx: number of sectors (512 Bytes each)
+    71                              <1> ;   dx: segment of buffer
+    72                              <1> ; CLOBBER
+    73                              <1> ;   ax, bx, cx, dx, si
+    74                              <1> ; TODO rewrite to (eventually) move larger parts at once
+    75                              <1> ; if that is done increase buffer_size_sectors in startup-common to that (max 0x80000 - startup_end)
+    76                              <1> load:
+    77 0000006D 83F97F              <1>     cmp cx, 127
+    78 00000070 7615                <1>     jbe .good_size
+    79                              <1> 
+    80 00000072 60                  <1>     pusha
+    81 00000073 B97F00              <1>     mov cx, 127
+    82 00000076 E8F4FF              <1>     call load
+    83 00000079 61                  <1>     popa
+    84 0000007A 6683C07F            <1>     add eax, 127
+    85 0000007E 81C2E00F            <1>     add dx, 127 * 512 / 16
+    86 00000082 83E97F              <1>     sub cx, 127
+    87                              <1> 
+    88 00000085 EBE6                <1>     jmp load
+    89                              <1> .good_size:
+    90 00000087 66A3[B601]          <1>     mov [DAPACK.addr], eax
+    91 0000008B 891E[B201]          <1>     mov [DAPACK.buf], bx
+    92 0000008F 890E[B001]          <1>     mov [DAPACK.count], cx
+    93 00000093 8916[B401]          <1>     mov [DAPACK.seg], dx
+    94                              <1> 
+    95 00000097 E86C00              <1>     call print_dapack
+    96                              <1> 
+    97 0000009A 803E[AA01]00        <1>     cmp byte [chs.s], 0
+    98 0000009F 7510                <1>     jne .chs
+    99                              <1>     ;INT 0x13 extended read does not work on CDROM!
+   100 000000A1 8A16[A101]          <1>     mov dl, [disk]
+   101 000000A5 BE[AE01]            <1>     mov si, DAPACK
+   102 000000A8 B442                <1>     mov ah, 0x42
+   103 000000AA CD13                <1>     int 0x13
+   104 000000AC 0F828E00            <1>     jc error ; carry flag set on error
+   105 000000B0 C3                  <1>     ret
+   106                              <1> 
+   107                              <1> .chs:
+   108                              <1>     ; calculate CHS
+   109 000000B1 6631D2              <1>     xor edx, edx
+   110 000000B4 66A1[B601]          <1>     mov eax, [DAPACK.addr]
+   111 000000B8 66F736[AA01]        <1>     div dword [chs.s] ; divide by sectors
+   112 000000BD 6689D1              <1>     mov ecx, edx ; move sector remainder to ecx
+   113 000000C0 6631D2              <1>     xor edx, edx
+   114 000000C3 66F736[A601]        <1>     div dword [chs.h] ; divide by heads
+   115                              <1>     ; eax has cylinders, edx has heads, ecx has sectors
+   116                              <1> 
+   117                              <1>     ; Sector cannot be greater than 63
+   118 000000C8 6641                <1>     inc ecx ; Sector is base 1
+   119 000000CA 6683F93F            <1>     cmp ecx, 63
+   120 000000CE 776C                <1>     ja error_chs
+   121                              <1> 
+   122                              <1>     ; Head cannot be greater than 255
+   123 000000D0 6681FAFF000000      <1>     cmp edx, 255
+   124 000000D7 7763                <1>     ja error_chs
+   125                              <1> 
+   126                              <1>     ; Cylinder cannot be greater than 1023
+   127 000000D9 663DFF030000        <1>     cmp eax, 1023
+   128 000000DF 775B                <1>     ja error_chs
+   129                              <1> 
+   130                              <1>     ; Move CHS values to parameters
+   131 000000E1 88C5                <1>     mov ch, al
+   132 000000E3 C0E406              <1>     shl ah, 6
+   133 000000E6 80E13F              <1>     and cl, 0x3f
+   134 000000E9 08E1                <1>     or cl, ah
+   135 000000EB C1E208              <1>     shl dx, 8
+   136                              <1> 
+   137                              <1>     ; read from disk using CHS
+   138 000000EE A0[B001]            <1>     mov al, [DAPACK.count]
+   139 000000F1 B402                <1>     mov ah, 0x02 ; disk read (CHS)
+   140 000000F3 8B1E[B201]          <1>     mov bx, [DAPACK.buf]
+   141 000000F7 8A16[A101]          <1>     mov dl, [disk]
+   142 000000FB 06                  <1>     push es ; save ES
+   143 000000FC 8E06[B401]          <1>     mov es, [DAPACK.seg]
+   144 00000100 CD13                <1>     int 0x13
+   145 00000102 07                  <1>     pop es ; restore EC
+   146 00000103 7239                <1>     jc error ; carry flag set on error
+   147 00000105 C3                  <1>     ret
+   148                              <1> 
+   149                              <1> print_dapack:
+   150 00000106 8B1E[B801]          <1>     mov bx, [DAPACK.addr + 2]
+   151 0000010A E86E00              <1>     call print_hex
+   152                              <1> 
+   153 0000010D 8B1E[B601]          <1>     mov bx, [DAPACK.addr]
+   154 00000111 E86700              <1>     call print_hex
+   155                              <1> 
+   156 00000114 B023                <1>     mov al, '#'
+   157 00000116 E85800              <1>     call print_char
+   158                              <1> 
+   159 00000119 8B1E[B001]          <1>     mov bx, [DAPACK.count]
+   160 0000011D E85B00              <1>     call print_hex
+   161                              <1> 
+   162 00000120 B020                <1>     mov al, ' '
+   163 00000122 E84C00              <1>     call print_char
+   164                              <1> 
+   165 00000125 8B1E[B401]          <1>     mov bx, [DAPACK.seg]
+   166 00000129 E84F00              <1>     call print_hex
+   167                              <1> 
+   168 0000012C B03A                <1>     mov al, ':'
+   169 0000012E E84000              <1>     call print_char
+   170                              <1> 
+   171 00000131 8B1E[B201]          <1>     mov bx, [DAPACK.buf]
+   172 00000135 E84300              <1>     call print_hex
+   173                              <1> 
+   174 00000138 E81F00              <1>     call print_line
+   175                              <1> 
+   176 0000013B C3                  <1>     ret
+   177                              <1> 
+   178                              <1> error_chs:
+   179 0000013C B400                <1>     mov ah, 0
+   180                              <1> 
+   181                              <1> error:
+   182 0000013E E81900              <1>     call print_line
+   183                              <1> 
+   184 00000141 B700                <1>     mov bh, 0
+   185 00000143 88E3                <1>     mov bl, ah
+   186 00000145 E83300              <1>     call print_hex
+   187                              <1> 
+   188 00000148 B020                <1>     mov al, ' '
+   189 0000014A E82400              <1>     call print_char
+   190                              <1> 
+   191 0000014D BE[9B01]            <1>     mov si, error_msg
+   192 00000150 E81000              <1>     call print
+   193 00000153 E80400              <1>     call print_line
+   194                              <1> .halt:
+   195 00000156 FA                  <1>     cli
+   196 00000157 F4                  <1>     hlt
+   197 00000158 EBFC                <1>     jmp .halt
+   198                              <1> 
+   199                              <1> %include "print.asm"
+     1                              <2> SECTION .text
+     2                              <2> USE16
+     3                              <2> 
+     4                              <2> ; provide function for printing in x86 real mode
+     5                              <2> 
+     6                              <2> ; print a string and a newline
+     7                              <2> ; CLOBBER
+     8                              <2> ;   ax
+     9                              <2> print_line:
+    10 0000015A B00D                <2>     mov al, 13
+    11 0000015C E81200              <2>     call print_char
+    12 0000015F B00A                <2>     mov al, 10
+    13 00000161 EB0E                <2>     jmp print_char
+    14                              <2> 
+    15                              <2> ; print a string
+    16                              <2> ; IN
+    17                              <2> ;   si: points at zero-terminated String
+    18                              <2> ; CLOBBER
+    19                              <2> ;   si, ax
+    20                              <2> print:
+    21 00000163 9C                  <2>     pushf
+    22 00000164 FC                  <2>     cld
+    23                              <2> .loop:
+    24 00000165 AC                  <2>     lodsb
+    25 00000166 84C0                <2>     test al, al
+    26 00000168 7405                <2>     jz .done
+    27 0000016A E80400              <2>     call print_char
+    28 0000016D EBF6                <2>     jmp .loop
+    29                              <2> .done:
+    30 0000016F 9D                  <2>     popf
+    31 00000170 C3                  <2>     ret
+    32                              <2> 
+    33                              <2> ; print a character
+    34                              <2> ; IN
+    35                              <2> ;   al: character to print
+    36                              <2> print_char:
+    37 00000171 60                  <2>     pusha
+    38 00000172 BB0700              <2>     mov bx, 7
+    39 00000175 B40E                <2>     mov ah, 0x0e
+    40 00000177 CD10                <2>     int 0x10
+    41 00000179 61                  <2>     popa
+    42 0000017A C3                  <2>     ret
+    43                              <2> 
+    44                              <2> ; print a number in hex
+    45                              <2> ; IN
+    46                              <2> ;   bx: the number
+    47                              <2> ; CLOBBER
+    48                              <2> ;   al, cx
+    49                              <2> print_hex:
+    50 0000017B B90400              <2>     mov cx, 4
+    51                              <2> .lp:
+    52 0000017E 88F8                <2>     mov al, bh
+    53 00000180 C0E804              <2>     shr al, 4
+    54                              <2> 
+    55 00000183 3C0A                <2>     cmp al, 0xA
+    56 00000185 7202                <2>     jb .below_0xA
+    57                              <2> 
+    58 00000187 0407                <2>     add al, 'A' - 0xA - '0'
+    59                              <2> .below_0xA:
+    60 00000189 0430                <2>     add al, '0'
+    61                              <2> 
+    62 0000018B E8E3FF              <2>     call print_char
+    63                              <2> 
+    64 0000018E C1E304              <2>     shl bx, 4
+    65 00000191 E2EB                <2>     loop .lp
+    66                              <2> 
+    67 00000193 C3                  <2>     ret
+   200                              <1> 
+   201 00000194 53746167652000      <1> stage_msg: db "Stage ",0
+   202 0000019B 4552524F5200        <1> error_msg: db "ERROR",0
+   203                              <1> 
+   204 000001A1 00                  <1> disk: db 0
+   205                              <1> 
+   206                              <1> chs:
+   207 000001A2 00000000            <1> .c: dd 0
+   208 000001A6 00000000            <1> .h: dd 0
+   209 000001AA 00000000            <1> .s: dd 0
+   210                              <1> 
+   211                              <1> DAPACK:
+   212 000001AE 10                  <1>         db 0x10
+   213 000001AF 00                  <1>         db 0
+   214 000001B0 0000                <1> .count: dw 0 ; int 13 resets this to # of blocks actually read/written
+   215 000001B2 0000                <1> .buf:   dw 0 ; memory buffer destination address (0:7c00)
+   216 000001B4 0000                <1> .seg:   dw 0 ; in memory page zero
+   217 000001B6 0000000000000000    <1> .addr:  dq 0 ; put the lba to read in this spot
+   218                              <1> 
+   219                              <1> times 446-($-$$) db 0
+   220 000001BE 00<rep 40h>         <1> partitions: times 4 * 16 db 0
+   221 000001FE 55                  <1> db 0x55
+   222 000001FF AA                  <1> db 0xaa
+     5                                  
+     6                                  ; GPT area from sector 1 to 33, loaded at 0x7E00
+     7 00000200 00<rep 4200h>           times (33*512) db 0
+     8                                  
+     9                                  ; stage 2, loaded at 0xC000
+    10                                  stage2:
+    11                                      %include "stage2.asm"
+     1                              <1> SECTION .text
+     2                              <1> USE16
+     3                              <1> 
+     4                              <1> stage2.entry:
+     5                              <1>     ; check for required features
+     6 00004400 E81200              <1>     call cpuid_check
+     7                              <1> 
+     8                              <1>     ; enable A20-Line via IO-Port 92, might not work on all motherboards
+     9 00004403 E492                <1>     in al, 0x92
+    10 00004405 0C02                <1>     or al, 2
+    11 00004407 E692                <1>     out 0x92, al
+    12                              <1> 
+    13 00004409 66C706[F045]-       <1>     mov dword [protected_mode.func], stage3.entry
+    13 0000440E [05470000]          <1>
+    14 00004412 E9DF01              <1>     jmp protected_mode.entry
+    15                              <1> 
+    16                              <1> %include "cpuid.asm"
+     1                              <2> SECTION .text
+     2                              <2> USE16
+     3                              <2> 
+     4                              <2> cpuid_required_features:
+     5                              <2>     .edx equ cpuid_edx.fpu | cpuid_edx.pse | cpuid_edx.pge | cpuid_edx.fxsr
+     6                              <2>     .ecx equ 0
+     7                              <2> 
+     8                              <2> cpuid_check:
+     9                              <2>     ; If bit 21 of EFLAGS can be changed, then CPUID is supported
+    10 00004415 669C                <2>     pushfd                               ;Save EFLAGS
+    11 00004417 669C                <2>     pushfd                               ;Store EFLAGS
+    12 00004419 666781342400002000  <2>     xor dword [esp],0x00200000           ;Invert the ID bit in stored EFLAGS
+    13 00004422 669D                <2>     popfd                                ;Load stored EFLAGS (with ID bit inverted)
+    14 00004424 669C                <2>     pushfd                               ;Store EFLAGS again (ID bit may or may not be inverted)
+    15 00004426 6658                <2>     pop eax                              ;eax = modified EFLAGS (ID bit may or may not be inverted)
+    16 00004428 6667330424          <2>     xor eax,[esp]                        ;eax = whichever bits were changed
+    17 0000442D 669D                <2>     popfd                                ;Restore original EFLAGS
+    18 0000442F 66A900002000        <2>     test eax,0x00200000                  ;eax = zero if ID bit can't be changed, else non-zero
+    19 00004435 7423                <2>     jz .no_cpuid
+    20                              <2> 
+    21 00004437 66B801000000        <2>     mov eax, 1
+    22 0000443D 0FA2                <2>     cpuid
+    23                              <2> 
+    24 0000443F 6681E209200001      <2>     and edx, cpuid_required_features.edx
+    25 00004446 6681FA09200001      <2>     cmp edx, cpuid_required_features.edx
+    26 0000444D 751A                <2>     jne .error
+    27                              <2> 
+    28 0000444F 6683E100            <2>     and ecx, cpuid_required_features.ecx
+    29 00004453 6683F900            <2>     cmp ecx, cpuid_required_features.ecx
+    30 00004457 7510                <2>     jne .error
+    31                              <2> 
+    32 00004459 C3                  <2>     ret
+    33                              <2> 
+    34                              <2> .no_cpuid:
+    35 0000445A BE[ED44]            <2>     mov si, .msg_cpuid
+    36 0000445D E803BD              <2>     call print
+    37                              <2> 
+    38 00004460 BE[2745]            <2>     mov si, .msg_line
+    39 00004463 E8FDBC              <2>     call print
+    40                              <2> 
+    41 00004466 E98000              <2>     jmp .halt
+    42                              <2> 
+    43                              <2> .error:
+    44 00004469 6651                <2>     push ecx
+    45 0000446B 6652                <2>     push edx
+    46                              <2> 
+    47 0000446D BE[0145]            <2>     mov si, .msg_features
+    48 00004470 E8F0BC              <2>     call print
+    49                              <2> 
+    50 00004473 BE[2745]            <2>     mov si, .msg_line
+    51 00004476 E8EABC              <2>     call print
+    52                              <2> 
+    53 00004479 BE[2A45]            <2>     mov si, .msg_edx
+    54 0000447C E8E4BC              <2>     call print
+    55                              <2> 
+    56 0000447F 665B                <2>     pop ebx
+    57 00004481 6653                <2>     push ebx
+    58 00004483 66C1EB10            <2>     shr ebx, 16
+    59 00004487 E8F1BC              <2>     call print_hex
+    60                              <2> 
+    61 0000448A 665B                <2>     pop ebx
+    62 0000448C E8ECBC              <2>     call print_hex
+    63                              <2> 
+    64 0000448F BE[3445]            <2>     mov si, .msg_must_contain
+    65 00004492 E8CEBC              <2>     call print
+    66                              <2> 
+    67 00004495 66BB09200001        <2>     mov ebx, cpuid_required_features.edx
+    68 0000449B 66C1EB10            <2>     shr ebx, 16
+    69 0000449F E8D9BC              <2>     call print_hex
+    70                              <2> 
+    71 000044A2 66BB09200001        <2>     mov ebx, cpuid_required_features.edx
+    72 000044A8 E8D0BC              <2>     call print_hex
+    73                              <2> 
+    74 000044AB BE[2745]            <2>     mov si, .msg_line
+    75 000044AE E8B2BC              <2>     call print
+    76                              <2> 
+    77 000044B1 BE[2F45]            <2>     mov si, .msg_ecx
+    78 000044B4 E8ACBC              <2>     call print
+    79                              <2> 
+    80 000044B7 665B                <2>     pop ebx
+    81 000044B9 6653                <2>     push ebx
+    82 000044BB 66C1EB10            <2>     shr ebx, 16
+    83 000044BF E8B9BC              <2>     call print_hex
+    84                              <2> 
+    85 000044C2 665B                <2>     pop ebx
+    86 000044C4 E8B4BC              <2>     call print_hex
+    87                              <2> 
+    88 000044C7 BE[3445]            <2>     mov si, .msg_must_contain
+    89 000044CA E896BC              <2>     call print
+    90                              <2> 
+    91 000044CD 66BB00000000        <2>     mov ebx, cpuid_required_features.ecx
+    92 000044D3 66C1EB10            <2>     shr ebx, 16
+    93 000044D7 E8A1BC              <2>     call print_hex
+    94                              <2> 
+    95 000044DA 66BB00000000        <2>     mov ebx, cpuid_required_features.ecx
+    96 000044E0 E898BC              <2>     call print_hex
+    97                              <2> 
+    98 000044E3 BE[2745]            <2>     mov si, .msg_line
+    99 000044E6 E87ABC              <2>     call print
+   100                              <2> 
+   101                              <2> .halt:
+   102 000044E9 FA                  <2>     cli
+   103 000044EA F4                  <2>     hlt
+   104 000044EB EBFC                <2>     jmp .halt
+   105                              <2> 
+   106 000044ED 4350554944206E6F74- <2> .msg_cpuid: db "CPUID not supported",0
+   106 000044F6 20737570706F727465- <2>
+   106 000044FF 6400                <2>
+   107 00004501 526571756972656420- <2> .msg_features: db "Required CPU features are not present",0
+   107 0000450A 435055206665617475- <2>
+   107 00004513 72657320617265206E- <2>
+   107 0000451C 6F742070726573656E- <2>
+   107 00004525 7400                <2>
+   108 00004527 0D0A00              <2> .msg_line: db 13,10,0
+   109 0000452A 4544582000          <2> .msg_edx: db "EDX ",0
+   110 0000452F 4543582000          <2> .msg_ecx: db "ECX ",0
+   111 00004534 206D75737420636F6E- <2> .msg_must_contain: db " must contain ",0
+   111 0000453D 7461696E2000        <2>
+   112                              <2> 
+   113                              <2> cpuid_edx:
+   114                              <2>     .fpu                 equ 1 << 0
+   115                              <2>     .vme                 equ 1 << 1
+   116                              <2>     .de                  equ 1 << 2
+   117                              <2>     .pse                 equ 1 << 3
+   118                              <2>     .tsc                 equ 1 << 4
+   119                              <2>     .msr                 equ 1 << 5
+   120                              <2>     .pae                 equ 1 << 6
+   121                              <2>     .mce                 equ 1 << 7
+   122                              <2>     .cx8                 equ 1 << 8
+   123                              <2>     .apic                equ 1 << 9
+   124                              <2>     .sep                 equ 1 << 11
+   125                              <2>     .mtrr                equ 1 << 12
+   126                              <2>     .pge                 equ 1 << 13
+   127                              <2>     .mca                 equ 1 << 14
+   128                              <2>     .cmov                equ 1 << 15
+   129                              <2>     .pat                 equ 1 << 16
+   130                              <2>     .pse_36              equ 1 << 17
+   131                              <2>     .psn                 equ 1 << 18
+   132                              <2>     .clfsh               equ 1 << 19
+   133                              <2>     .ds                  equ 1 << 21
+   134                              <2>     .acpi                equ 1 << 22
+   135                              <2>     .mmx                 equ 1 << 23
+   136                              <2>     .fxsr                equ 1 << 24
+   137                              <2>     .sse                 equ 1 << 25
+   138                              <2>     .sse2                equ 1 << 26
+   139                              <2>     .ss                  equ 1 << 27
+   140                              <2>     .htt                 equ 1 << 28
+   141                              <2>     .tm                  equ 1 << 29
+   142                              <2>     .ia64                equ 1 << 30
+   143                              <2>     .pbe                 equ 1 << 31
+   144                              <2> 
+   145                              <2> cpuid_ecx:
+   146                              <2>     .sse3                equ 1 << 0
+   147                              <2>     .pclmulqdq           equ 1 << 1
+   148                              <2>     .dtes64              equ 1 << 2
+   149                              <2>     .monitor             equ 1 << 3
+   150                              <2>     .ds_cpl              equ 1 << 4
+   151                              <2>     .vmx                 equ 1 << 5
+   152                              <2>     .smx                 equ 1 << 6
+   153                              <2>     .est                 equ 1 << 7
+   154                              <2>     .tm2                 equ 1 << 8
+   155                              <2>     .ssse3               equ 1 << 9
+   156                              <2>     .cnxt_id             equ 1 << 10
+   157                              <2>     .sdbg                equ 1 << 11
+   158                              <2>     .fma                 equ 1 << 12
+   159                              <2>     .cmpxchg16b          equ 1 << 13
+   160                              <2>     .xtpr                equ 1 << 14
+   161                              <2>     .pdcm                equ 1 << 15
+   162                              <2>     .pcid                equ 1 << 17
+   163                              <2>     .dca                 equ 1 << 18
+   164                              <2>     .sse4_1              equ 1 << 19
+   165                              <2>     .sse4_2              equ 1 << 20
+   166                              <2>     .x2apic              equ 1 << 21
+   167                              <2>     .movbe               equ 1 << 22
+   168                              <2>     .popcnt              equ 1 << 23
+   169                              <2>     .tsc_deadline        equ 1 << 24
+   170                              <2>     .aes                 equ 1 << 25
+   171                              <2>     .xsave               equ 1 << 26
+   172                              <2>     .osxsave             equ 1 << 27
+   173                              <2>     .avx                 equ 1 << 28
+   174                              <2>     .f16c                equ 1 << 29
+   175                              <2>     .rdrand              equ 1 << 30
+   176                              <2>     .hypervisor          equ 1 << 31
+    17                              <1> %include "gdt.asm"
+     1                              <2> SECTION .text ; cannot use .data
+     2                              <2> 
+     3                              <2> struc GDTEntry
+     4 00000000 ????                <2>     .limitl resw 1
+     5 00000002 ????                <2>     .basel resw 1
+     6 00000004 ??                  <2>     .basem resb 1
+     7 00000005 ??                  <2>     .attribute resb 1
+     8 00000006 ??                  <2>     .flags__limith resb 1
+     9 00000007 ??                  <2>     .baseh resb 1
+    10                              <2> endstruc
+    11                              <2> 
+    12                              <2> gdt_attr:
+    13                              <2>     .present              equ 1 << 7
+    14                              <2>     .ring1                equ 1 << 5
+    15                              <2>     .ring2                equ 1 << 6
+    16                              <2>     .ring3                equ 1 << 5 | 1 << 6
+    17                              <2>     .user                 equ 1 << 4
+    18                              <2> ;user
+    19                              <2>     .code                 equ 1 << 3
+    20                              <2> ;   code
+    21                              <2>     .conforming           equ 1 << 2
+    22                              <2>     .readable             equ 1 << 1
+    23                              <2> ;   data
+    24                              <2>     .expand_down          equ 1 << 2
+    25                              <2>     .writable             equ 1 << 1
+    26                              <2>     .accessed             equ 1 << 0
+    27                              <2> ;system
+    28                              <2> ;   legacy
+    29                              <2>     .tssAvailabe16        equ 0x1
+    30                              <2>     .ldt                  equ 0x2
+    31                              <2>     .tssBusy16            equ 0x3
+    32                              <2>     .call16               equ 0x4
+    33                              <2>     .task                 equ 0x5
+    34                              <2>     .interrupt16          equ 0x6
+    35                              <2>     .trap16               equ 0x7
+    36                              <2>     .tssAvailabe32        equ 0x9
+    37                              <2>     .tssBusy32            equ 0xB
+    38                              <2>     .call32               equ 0xC
+    39                              <2>     .interrupt32          equ 0xE
+    40                              <2>     .trap32               equ 0xF
+    41                              <2> ;   long mode
+    42                              <2>     .ldt32                equ 0x2
+    43                              <2>     .tssAvailabe64        equ 0x9
+    44                              <2>     .tssBusy64            equ 0xB
+    45                              <2>     .call64               equ 0xC
+    46                              <2>     .interrupt64          equ 0xE
+    47                              <2>     .trap64               equ 0xF
+    48                              <2> 
+    49                              <2> gdt_flag:
+    50                              <2>     .granularity equ 1 << 7
+    51                              <2>     .available equ 1 << 4
+    52                              <2> ;user
+    53                              <2>     .default_operand_size equ 1 << 6
+    54                              <2> ;   code
+    55                              <2>     .long_mode equ 1 << 5
+    56                              <2> ;   data
+    57                              <2>     .reserved equ 1 << 5
+    58                              <2> 
+    59                              <2> gdtr:
+    60 00004543 3900                <2>     dw gdt.end + 1  ; size
+    61 00004545 [4D45000000000000]  <2>     dq gdt          ; offset
+    62                              <2> 
+    63                              <2> gdt:
+    64                              <2> .null equ $ - gdt
+    65 0000454D 0000000000000000    <2>     dq 0
+    66                              <2> 
+    67                              <2> .lm64_code equ $ - gdt
+    68                              <2> istruc GDTEntry
+    69 00004555 0000                <2>     at GDTEntry.limitl, dw 0
+    70 00004557 0000                <2>     at GDTEntry.basel, dw 0
+    71 00004559 00                  <2>     at GDTEntry.basem, db 0
+    72 0000455A 98                  <2>     at GDTEntry.attribute, db gdt_attr.present | gdt_attr.user | gdt_attr.code
+    73 0000455B 20                  <2>     at GDTEntry.flags__limith, db gdt_flag.long_mode
+    74 0000455C 00                  <2>     at GDTEntry.baseh, db 0
+    75                              <2> iend
+    76                              <2> 
+    77                              <2> .lm64_data equ $ - gdt
+    78                              <2> istruc GDTEntry
+    79 0000455D 0000                <2>     at GDTEntry.limitl, dw 0
+    80 0000455F 0000                <2>     at GDTEntry.basel, dw 0
+    81 00004561 00                  <2>     at GDTEntry.basem, db 0
+    82                              <2> ; AMD System Programming Manual states that the writeable bit is ignored in long mode, but ss can not be set to this descriptor without it
+    83 00004562 92                  <2>     at GDTEntry.attribute, db gdt_attr.present | gdt_attr.user | gdt_attr.writable
+    84 00004563 00                  <2>     at GDTEntry.flags__limith, db 0
+    85 00004564 00                  <2>     at GDTEntry.baseh, db 0
+    86                              <2> iend
+    87                              <2> 
+    88                              <2> .pm32_code equ $ - gdt
+    89                              <2>     istruc GDTEntry
+    90 00004565 FFFF                <2>         at GDTEntry.limitl, dw 0xFFFF
+    91 00004567 0000                <2>         at GDTEntry.basel, dw 0
+    92 00004569 00                  <2>         at GDTEntry.basem, db 0
+    93 0000456A 9A                  <2>         at GDTEntry.attribute, db gdt_attr.present | gdt_attr.user | gdt_attr.code | gdt_attr.readable
+    94 0000456B CF                  <2>         at GDTEntry.flags__limith, db 0xF | gdt_flag.granularity | gdt_flag.default_operand_size
+    95 0000456C 00                  <2>         at GDTEntry.baseh, db 0
+    96                              <2>     iend
+    97                              <2> 
+    98                              <2> .pm32_data equ $ - gdt
+    99                              <2>     istruc GDTEntry
+   100 0000456D FFFF                <2>         at GDTEntry.limitl, dw 0xFFFF
+   101 0000456F 0000                <2>         at GDTEntry.basel, dw 0
+   102 00004571 00                  <2>         at GDTEntry.basem, db 0
+   103 00004572 92                  <2>         at GDTEntry.attribute, db gdt_attr.present | gdt_attr.user | gdt_attr.writable
+   104 00004573 CF                  <2>         at GDTEntry.flags__limith, db 0xF | gdt_flag.granularity | gdt_flag.default_operand_size
+   105 00004574 00                  <2>         at GDTEntry.baseh, db 0
+   106                              <2>     iend
+   107                              <2> 
+   108                              <2> .pm16_code equ $ - gdt
+   109                              <2>     istruc GDTEntry
+   110 00004575 FFFF                <2>         at GDTEntry.limitl, dw 0xFFFF
+   111 00004577 0000                <2>         at GDTEntry.basel, dw 0
+   112 00004579 00                  <2>         at GDTEntry.basem, db 0
+   113 0000457A 9A                  <2>         at GDTEntry.attribute, db gdt_attr.present | gdt_attr.user | gdt_attr.code | gdt_attr.readable
+   114 0000457B 0F                  <2>         at GDTEntry.flags__limith, db 0xF
+   115 0000457C 00                  <2>         at GDTEntry.baseh, db 0
+   116                              <2>     iend
+   117                              <2> 
+   118                              <2> .pm16_data equ $ - gdt
+   119                              <2>     istruc GDTEntry
+   120 0000457D FFFF                <2>         at GDTEntry.limitl, dw 0xFFFF
+   121 0000457F 0000                <2>         at GDTEntry.basel, dw 0
+   122 00004581 00                  <2>         at GDTEntry.basem, db 0
+   123 00004582 92                  <2>         at GDTEntry.attribute, db gdt_attr.present | gdt_attr.user | gdt_attr.writable
+   124 00004583 0F                  <2>         at GDTEntry.flags__limith, db 0xF
+   125 00004584 00                  <2>         at GDTEntry.baseh, db 0
+   126                              <2>     iend
+   127                              <2> 
+   128                              <2> .end equ $ - gdt
+    18                              <1> %include "long_mode.asm"
+     1                              <2> SECTION .text
+     2                              <2> USE32
+     3                              <2> 
+     4                              <2> long_mode:
+     5 00004585 0000000000000000    <2> .func: dq 0
+     6 0000458D 00000000            <2> .page_table: dd 0
+     7                              <2> 
+     8                              <2> .entry:
+     9                              <2>     ; disable interrupts
+    10 00004591 FA                  <2>     cli
+    11                              <2> 
+    12                              <2>     ; disable paging
+    13 00004592 0F20C0              <2>     mov eax, cr0
+    14 00004595 25FFFFFF7F          <2>     and eax, 0x7FFFFFFF
+    15 0000459A 0F22C0              <2>     mov cr0, eax
+    16                              <2> 
+    17                              <2>     ; enable FXSAVE/FXRSTOR, Page Global, Page Address Extension, and Page Size Extension
+    18 0000459D 0F20E0              <2>     mov eax, cr4
+    19 000045A0 0DB0020000          <2>     or eax, 1 << 9 | 1 << 7 | 1 << 5 | 1 << 4
+    20 000045A5 0F22E0              <2>     mov cr4, eax
+    21                              <2> 
+    22                              <2>     ; load long mode GDT
+    23 000045A8 0F0115[43450000]    <2>     lgdt [gdtr]
+    24                              <2> 
+    25                              <2>     ; enable long mode
+    26 000045AF B9800000C0          <2>     mov ecx, 0xC0000080               ; Read from the EFER MSR.
+    27 000045B4 0F32                <2>     rdmsr
+    28 000045B6 0D00090000          <2>     or eax, 1 << 11 | 1 << 8          ; Set the Long-Mode-Enable and NXE bit.
+    29 000045BB 0F30                <2>     wrmsr
+    30                              <2> 
+    31                              <2>     ; set page table
+    32 000045BD A1[8D450000]        <2>     mov eax, [.page_table]
+    33 000045C2 0F22D8              <2>     mov cr3, eax
+    34                              <2> 
+    35                              <2>     ; enabling paging and protection simultaneously
+    36 000045C5 0F20C0              <2>     mov eax, cr0
+    37 000045C8 0D01000180          <2>     or eax, 1 << 31 | 1 << 16 | 1                ;Bit 31: Paging, Bit 16: write protect kernel, Bit 0: Protected Mode
+    38 000045CD 0F22C0              <2>     mov cr0, eax
+    39                              <2> 
+    40                              <2>     ; far jump to enable Long Mode and load CS with 64 bit segment
+    41 000045D0 EA[D7450000]0800    <2>     jmp gdt.lm64_code:.inner
+    42                              <2> 
+    43                              <2> USE64
+    44                              <2> 
+    45                              <2> .inner:
+    46                              <2>     ; load all the other segments with 64 bit data segments
+    47 000045D7 B810000000          <2>     mov rax, gdt.lm64_data
+    48 000045DC 8ED8                <2>     mov ds, rax
+    49 000045DE 8EC0                <2>     mov es, rax
+    50 000045E0 8EE0                <2>     mov fs, rax
+    51 000045E2 8EE8                <2>     mov gs, rax
+    52 000045E4 8ED0                <2>     mov ss, rax
+    53                              <2> 
+    54                              <2>     ; jump to specified function
+    55 000045E6 488B0425[85450000]  <2>     mov rax, [.func]
+    56 000045EE FFE0                <2>     jmp rax
+    19                              <1> %include "protected_mode.asm"
+     1                              <2> SECTION .text
+     2                              <2> USE16
+     3                              <2> 
+     4                              <2> protected_mode:
+     5                              <2> 
+     6 000045F0 00000000            <2> .func: dd 0
+     7                              <2> 
+     8                              <2> .entry:
+     9                              <2>     ; disable interrupts
+    10 000045F4 FA                  <2>     cli
+    11                              <2> 
+    12                              <2>     ; load protected mode GDT
+    13 000045F5 0F0116[4345]        <2>     lgdt [gdtr]
+    14                              <2> 
+    15                              <2>     ; set protected mode bit of cr0
+    16 000045FA 0F20C0              <2>     mov eax, cr0
+    17 000045FD 6683C801            <2>     or eax, 1
+    18 00004601 0F22C0              <2>     mov cr0, eax
+    19                              <2> 
+    20                              <2>     ; far jump to load CS with 32 bit segment
+    21 00004604 EA[0946]1800        <2>     jmp gdt.pm32_code:.inner
+    22                              <2> 
+    23                              <2> USE32
+    24                              <2> 
+    25                              <2> .inner:
+    26                              <2>     ; load all the other segments with 32 bit data segments
+    27 00004609 B820000000          <2>     mov eax, gdt.pm32_data
+    28 0000460E 8ED8                <2>     mov ds, eax
+    29 00004610 8EC0                <2>     mov es, eax
+    30 00004612 8EE0                <2>     mov fs, eax
+    31 00004614 8EE8                <2>     mov gs, eax
+    32 00004616 8ED0                <2>     mov ss, eax
+    33                              <2> 
+    34                              <2>     ; jump to specified function
+    35 00004618 A1[F0450000]        <2>     mov eax, [.func]
+    36 0000461D FFE0                <2>     jmp eax
+    20                              <1> %include "thunk.asm"
+     1                              <2> SECTION .text
+     2                              <2> USE32
+     3                              <2> 
+     4                              <2> thunk:
+     5                              <2> .int10:
+     6 0000461F C705[4F460000]-     <2>     mov dword [.func], .int10_real
+     6 00004625 [89460000]          <2>
+     7 00004629 EB30                <2>     jmp .enter
+     8                              <2> 
+     9                              <2> .int13:
+    10 0000462B C705[4F460000]-     <2>     mov dword [.func], .int13_real
+    10 00004631 [8C460000]          <2>
+    11 00004635 EB24                <2>     jmp .enter
+    12                              <2> 
+    13                              <2> .int15:
+    14 00004637 C705[4F460000]-     <2>     mov dword [.func], .int15_real
+    14 0000463D [8F460000]          <2>
+    15 00004641 EB18                <2>     jmp .enter
+    16                              <2> 
+    17                              <2> .int16:
+    18 00004643 C705[4F460000]-     <2>     mov dword [.func], .int16_real
+    18 00004649 [92460000]          <2>
+    19 0000464D EB0C                <2>     jmp .enter
+    20                              <2> 
+    21 0000464F 00000000            <2> .func: dd 0
+    22 00004653 00000000            <2> .esp: dd 0
+    23 00004657 00000000            <2> .cr0: dd 0
+    24                              <2> 
+    25                              <2> .enter:
+    26                              <2>     ; save flags
+    27 0000465B 9C                  <2>     pushfd
+    28                              <2> 
+    29                              <2>     ; save registers
+    30 0000465C 60                  <2>     pushad
+    31                              <2> 
+    32                              <2>     ; save esp
+    33 0000465D 8925[53460000]      <2>     mov [.esp], esp
+    34                              <2> 
+    35                              <2>     ; load gdt
+    36 00004663 0F0115[43450000]    <2>     lgdt [gdtr]
+    37                              <2> 
+    38                              <2>     ; far jump to protected mode 16-bit
+    39 0000466A EA[95460000]2800    <2>     jmp gdt.pm16_code:.pm16
+    40                              <2> 
+    41                              <2> .exit:
+    42                              <2>     ; set segment selectors to 32-bit protected mode
+    43 00004671 B820000000          <2>     mov eax, gdt.pm32_data
+    44 00004676 8ED8                <2>     mov ds, eax
+    45 00004678 8EC0                <2>     mov es, eax
+    46 0000467A 8EE0                <2>     mov fs, eax
+    47 0000467C 8EE8                <2>     mov gs, eax
+    48 0000467E 8ED0                <2>     mov ss, eax
+    49                              <2> 
+    50                              <2>     ; restore esp
+    51 00004680 8B25[53460000]      <2>     mov esp, [.esp]
+    52                              <2> 
+    53                              <2>     ; restore registers
+    54 00004686 61                  <2>     popad
+    55                              <2> 
+    56                              <2>     ; restore flags
+    57 00004687 9D                  <2>     popfd
+    58                              <2> 
+    59                              <2>     ; return
+    60 00004688 C3                  <2>     ret
+    61                              <2> 
+    62                              <2> USE16
+    63                              <2> 
+    64                              <2> .int10_real:
+    65 00004689 CD10                <2>     int 0x10
+    66 0000468B C3                  <2>     ret
+    67                              <2> 
+    68                              <2> .int13_real:
+    69 0000468C CD13                <2>     int 0x13
+    70 0000468E C3                  <2>     ret
+    71                              <2> 
+    72                              <2> .int15_real:
+    73 0000468F CD15                <2>     int 0x15
+    74 00004691 C3                  <2>     ret
+    75                              <2> 
+    76                              <2> .int16_real:
+    77 00004692 CD16                <2>     int 0x16
+    78 00004694 C3                  <2>     ret
+    79                              <2> 
+    80                              <2> .pm16:
+    81                              <2>     ; set segment selectors to protected mode 16-bit
+    82 00004695 66B830000000        <2>     mov eax, gdt.pm16_data
+    83 0000469B 8ED8                <2>     mov ds, eax
+    84 0000469D 8EC0                <2>     mov es, eax
+    85 0000469F 8EE0                <2>     mov fs, eax
+    86 000046A1 8EE8                <2>     mov gs, eax
+    87 000046A3 8ED0                <2>     mov ss, eax
+    88                              <2> 
+    89                              <2>     ; save cr0
+    90 000046A5 0F20C0              <2>     mov eax, cr0
+    91 000046A8 66A3[5746]          <2>     mov [.cr0], eax
+    92                              <2> 
+    93                              <2>     ; disable paging and protected mode
+    94 000046AC 6625FEFFFF7F        <2>     and eax, 0x7FFFFFFE
+    95 000046B2 0F22C0              <2>     mov cr0, eax
+    96                              <2> 
+    97                              <2>     ; far jump to real mode
+    98 000046B5 EA[BA46]0000        <2>     jmp 0:.real
+    99                              <2> 
+   100                              <2> .real:
+   101                              <2>     ; set segment selectors to real mode
+   102 000046BA 66B800000000        <2>     mov eax, 0
+   103 000046C0 8ED8                <2>     mov ds, eax
+   104 000046C2 8EC0                <2>     mov es, eax
+   105 000046C4 8EE0                <2>     mov fs, eax
+   106 000046C6 8EE8                <2>     mov gs, eax
+   107 000046C8 8ED0                <2>     mov ss, eax
+   108                              <2> 
+   109                              <2>     ; set stack
+   110 000046CA 66BCC07B0000        <2>     mov esp, 0x7C00 - 64
+   111                              <2> 
+   112                              <2>     ; load registers and ES
+   113 000046D0 07                  <2>     pop es
+   114 000046D1 665F                <2>     pop edi
+   115 000046D3 665E                <2>     pop esi
+   116 000046D5 665D                <2>     pop ebp
+   117 000046D7 665B                <2>     pop ebx
+   118 000046D9 665A                <2>     pop edx
+   119 000046DB 6659                <2>     pop ecx
+   120 000046DD 6658                <2>     pop eax
+   121                              <2> 
+   122                              <2>     ; enable interrupts
+   123 000046DF FB                  <2>     sti
+   124                              <2> 
+   125                              <2>     ; call real mode function
+   126 000046E0 FF16[4F46]          <2>     call [.func]
+   127                              <2> 
+   128                              <2>     ; disable interrupts
+   129 000046E4 FA                  <2>     cli
+   130                              <2> 
+   131                              <2>     ; save registers and ES
+   132 000046E5 6650                <2>     push eax
+   133 000046E7 6651                <2>     push ecx
+   134 000046E9 6652                <2>     push edx
+   135 000046EB 6653                <2>     push ebx
+   136 000046ED 6655                <2>     push ebp
+   137 000046EF 6656                <2>     push esi
+   138 000046F1 6657                <2>     push edi
+   139 000046F3 06                  <2>     push es
+   140                              <2> 
+   141                              <2>     ; load gdt (BIOS sometimes overwrites this)
+   142 000046F4 0F0116[4345]        <2>     lgdt [gdtr]
+   143                              <2> 
+   144                              <2>     ; restore cr0, will enable protected mode
+   145 000046F9 66A1[5746]          <2>     mov eax, [.cr0]
+   146 000046FD 0F22C0              <2>     mov cr0, eax
+   147                              <2> 
+   148                              <2>     ; far jump to protected mode 32-bit
+   149 00004700 EA[7146]1800        <2>     jmp gdt.pm32_code:.exit
+    21                              <1> 
+    22                              <1> USE32
+    23                              <1> 
+    24                              <1> stage3.entry:
+    25                              <1>     ; stage3 stack at 448 KiB (512KiB minus 64KiB disk buffer)
+    26 00004705 BC00000700          <1>     mov esp, 0x70000
+    27                              <1> 
+    28                              <1>     ; push arguments
+    29 0000470A B8[43460000]        <1>     mov eax, thunk.int16
+    30 0000470F 50                  <1>     push eax
+    31 00004710 B8[37460000]        <1>     mov eax, thunk.int15
+    32 00004715 50                  <1>     push eax
+    33 00004716 B8[2B460000]        <1>     mov eax, thunk.int13
+    34 0000471B 50                  <1>     push eax
+    35 0000471C B8[1F460000]        <1>     mov eax, thunk.int10
+    36 00004721 50                  <1>     push eax
+    37 00004722 31C0                <1>     xor eax, eax
+    38 00004724 A0[A1010000]        <1>     mov al, [disk]
+    39 00004729 50                  <1>     push eax
+    40 0000472A B8[53470000]        <1>     mov eax, kernel.entry
+    41 0000472F 50                  <1>     push eax
+    42 00004730 A1[18B40000]        <1>     mov eax, [stage3 + 0x18]
+    43 00004735 FFD0                <1>     call eax
+    44                              <1> .halt:
+    45 00004737 FA                  <1>     cli
+    46 00004738 F4                  <1>     hlt
+    47 00004739 EBFC                <1>     jmp .halt
+    48                              <1> 
+    49                              <1> kernel:
+    50 0000473B 0000000000000000    <1> .stack: dq 0
+    51 00004743 0000000000000000    <1> .func: dq 0
+    52 0000474B 0000000000000000    <1> .args: dq 0
+    53                              <1> 
+    54                              <1> .entry:
+    55                              <1>     ; page_table: usize
+    56 00004753 8B442404            <1>     mov eax, [esp + 4]
+    57 00004757 A3[8D450000]        <1>     mov [long_mode.page_table], eax
+    58                              <1> 
+    59                              <1>     ; stack: u64
+    60 0000475C 8B442408            <1>     mov eax, [esp + 8]
+    61 00004760 A3[3B470000]        <1>     mov [.stack], eax
+    62 00004765 8B44240C            <1>     mov eax, [esp + 12]
+    63 00004769 A3[3F470000]        <1>     mov [.stack + 4], eax
+    64                              <1> 
+    65                              <1>     ; func: u64
+    66 0000476E 8B442410            <1>     mov eax, [esp + 16]
+    67 00004772 A3[43470000]        <1>     mov [.func], eax
+    68 00004777 8B442414            <1>     mov eax, [esp + 20]
+    69 0000477B A3[47470000]        <1>     mov [.func + 4], eax
+    70                              <1> 
+    71                              <1>     ; args: *const KernelArgs
+    72 00004780 8B442418            <1>     mov eax, [esp + 24]
+    73 00004784 A3[4B470000]        <1>     mov [.args], eax
+    74                              <1> 
+    75                              <1>     ; long_mode: usize
+    76 00004789 8B44241C            <1>     mov eax, [esp + 28]
+    77 0000478D 85C0                <1>     test eax, eax
+    78 0000478F 740F                <1>     jz .inner32
+    79                              <1> 
+    80 00004791 B8[EC470000]        <1>     mov eax, .inner64
+    81 00004796 A3[85450000]        <1>     mov [long_mode.func], eax
+    82 0000479B E9F1FDFFFF          <1>     jmp long_mode.entry
+    83                              <1> 
+    84                              <1> .inner32:
+    85                              <1>     ; disable paging
+    86 000047A0 0F20C0              <1>     mov eax, cr0
+    87 000047A3 25FFFFFF7F          <1>     and eax, 0x7FFFFFFF
+    88 000047A8 0F22C0              <1>     mov cr0, eax
+    89                              <1> 
+    90                              <1>     ;TODO: PAE (1 << 5)
+    91                              <1>     ; enable FXSAVE/FXRSTOR, Page Global, and Page Size Extension
+    92 000047AB 0F20E0              <1>     mov eax, cr4
+    93 000047AE 0D90020000          <1>     or eax, 1 << 9 | 1 << 7 | 1 << 4
+    94 000047B3 0F22E0              <1>     mov cr4, eax
+    95                              <1> 
+    96                              <1>     ; set page table
+    97 000047B6 A1[8D450000]        <1>     mov eax, [long_mode.page_table]
+    98 000047BB 0F22D8              <1>     mov cr3, eax
+    99                              <1> 
+   100                              <1>     ; enabling paging and protection simultaneously
+   101 000047BE 0F20C0              <1>     mov eax, cr0
+   102                              <1>     ; Bit 31: Paging, Bit 16: write protect kernel, Bit 0: Protected Mode
+   103 000047C1 0D01000180          <1>     or eax, 1 << 31 | 1 << 16 | 1
+   104 000047C6 0F22C0              <1>     mov cr0, eax
+   105                              <1>     
+   106                              <1>     ; enable FPU
+   107                              <1>     ;TODO: move to Rust
+   108 000047C9 0F20C0              <1>     mov eax, cr0
+   109 000047CC 24F3                <1>     and al, 11110011b ; Clear task switched (3) and emulation (2)
+   110 000047CE 0C22                <1>     or al, 00100010b ; Set numeric error (5) monitor co-processor (1)
+   111 000047D0 0F22C0              <1>     mov cr0, eax
+   112 000047D3 DBE3                <1>     fninit
+   113                              <1> 
+   114 000047D5 8B25[3B470000]      <1>     mov esp, [.stack]
+   115 000047DB A1[4B470000]        <1>     mov eax, [.args]
+   116 000047E0 50                  <1>     push eax
+   117 000047E1 A1[43470000]        <1>     mov eax, [.func]
+   118 000047E6 FFD0                <1>     call eax
+   119                              <1> .halt32:
+   120 000047E8 FA                  <1>     cli
+   121 000047E9 F4                  <1>     hlt
+   122 000047EA EBFC                <1>     jmp .halt32
+   123                              <1> 
+   124                              <1> USE64
+   125                              <1> 
+   126                              <1> .inner64:
+   127 000047EC 488B2425[3B470000]  <1>     mov rsp, [.stack]
+   128 000047F4 488B0425[43470000]  <1>     mov rax, [.func]
+   129 000047FC 488B3C25[4B470000]  <1>     mov rdi, [.args]
+   130 00004804 FFD0                <1>     call rax
+   131                              <1> .halt64:
+   132 00004806 FA                  <1>     cli
+   133 00004807 F4                  <1>     hlt
+   134 00004808 EBFC                <1>     jmp .halt64
+    12 0000480A 00<rep 1F6h>                align 512, db 0
+    13                                  stage2.end:
+    14                                  
+    15                                  ; the maximum size of stage2 is 4 KiB
+    16 00004A00 00<rep A00h>            times (4*1024)-($-stage2) db 0
+    17                                  
+    18                                  ; ISO compatibility, uses up space until 0x12400
+    19                                  %include "iso.asm"
+     1                              <1> ; Simple ISO emulation with el torito
+     2                              <1> 
+     3                              <1> ; Fill until CD sector 0x10
+     4 00005400 00<rep 2C00h>       <1> times (0x10*2048)-($-$$) db 0
+     5                              <1> 
+     6                              <1> ; Volume record
+     7                              <1> ;TODO: fill in more fields
+     8                              <1> iso_volume_record:
+     9 00008000 01                  <1> db 1 ; Type volume record
+    10 00008001 4344303031          <1> db "CD001" ; Identifier
+    11 00008006 01                  <1> db 1 ; Version
+    12 00008007 00                  <1> db 0 ; Unused
+    13 00008008 20<rep 20h>         <1> times 32 db ' ' ; System identifier
+    14                              <1> .volume_id: ; Volume identifier
+    15 00008028 5265646F78204F53    <1> db 'Redox OS'
+    16 00008030 20<rep 18h>         <1> times 32-($-.volume_id) db ' '
+    17 00008048 00<rep 8h>          <1> times 8 db 0 ; Unused
+    18 00008050 1500000000000015    <1> db 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x15 ; Volume space size (0x15)
+    19 00008058 00<rep 20h>         <1> times 32 db 0 ; Unused
+    20 00008078 01000001            <1> db 0x01, 0x00, 0x00, 0x01 ; Volume set size
+    21 0000807C 01000001            <1> db 0x01, 0x00, 0x00, 0x01 ; Volume sequence number
+    22 00008080 00080800            <1> db 0x00, 0x08, 0x08, 0x00 ; Logical block size in little and big endian
+    23                              <1> 
+    24 00008084 00<rep 18h>         <1> times 156-($-iso_volume_record) db 0
+    25                              <1> 
+    26                              <1> ; Root directory entry
+    27                              <1> .root_directory:
+    28 0000809C 22                  <1> db 0x22 ; Length of entry
+    29 0000809D 00                  <1> db 0x00 ; Length of extended attributes
+    30 0000809E 1400000000000014    <1> db 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14 ; Location of extent (0x14)
+    31 000080A6 0008000000000800    <1> db 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00 ; Size of extent
+    32 000080AE 00000000000000      <1> db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ; Recording time
+    33 000080B5 02                  <1> db 0x02 ; File flags
+    34 000080B6 00                  <1> db 0x00 ; Interleaved file unit size
+    35 000080B7 00                  <1> db 0x00 ; Interleaved gap size
+    36 000080B8 01000001            <1> db 0x01, 0x00, 0x00, 0x01 ; Volume sequence number
+    37 000080BC 01                  <1> db 0x01 ; Length of file identifier
+    38 000080BD 00                  <1> db 0x00 ; File identifier
+    39                              <1> 
+    40 000080BE 20<rep 80h>         <1> times 128 db ' ' ; Volume set identifier
+    41 0000813E 20<rep 80h>         <1> times 128 db ' ' ; Publisher identifier
+    42 000081BE 20<rep 80h>         <1> times 128 db ' ' ; Data preparer identifier
+    43 0000823E 20<rep 80h>         <1> times 128 db ' ' ; Application identifier
+    44 000082BE 20<rep 25h>         <1> times 37 db ' ' ; Copyright file ID
+    45 000082E3 20<rep 25h>         <1> times 37 db ' ' ; Abstract file ID
+    46 00008308 20<rep 25h>         <1> times 37 db ' ' ; Bibliographic file ID
+    47                              <1> 
+    48 0000832D 00<rep 44h>         <1> times 881-($-iso_volume_record) db 0
+    49                              <1> 
+    50 00008371 01                  <1> db 1 ; File structure version
+    51                              <1> 
+    52                              <1> ; Fill until CD sector 0x11
+    53 00008372 00<rep 48Eh>        <1> times (0x11*2048)-($-$$) db 0
+    54                              <1> 
+    55                              <1> ; Boot record
+    56                              <1> iso_boot_record:
+    57 00008800 00                  <1> db 0 ; Type boot record
+    58 00008801 4344303031          <1> db "CD001" ; Identifier
+    59 00008806 01                  <1> db 1 ; Version
+    60 00008807 454C20544F5249544F- <1> db "EL TORITO SPECIFICATION" ; Boot system identifier
+    60 00008810 205350454349464943- <1>
+    60 00008819 4154494F4E          <1>
+    61 0000881E 00<rep 29h>         <1> times 0x47-($ - iso_boot_record) db 0 ; Padding
+    62 00008847 13000000            <1> dd 0x13 ; Sector of boot catalog
+    63                              <1> 
+    64                              <1> ; Fill until CD sector 0x12
+    65 0000884B 00<rep 7B5h>        <1> times (0x12*2048)-($-$$) db 0
+    66                              <1> 
+    67                              <1> ; Terminator
+    68                              <1> iso_terminator:
+    69 00009000 FF                  <1> db 0xFF ; Type terminator
+    70 00009001 4344303031          <1> db "CD001" ; Identifier
+    71 00009006 01                  <1> db 1 ; Version
+    72                              <1> 
+    73                              <1> ; Fill until CD sector 0x13
+    74 00009007 00<rep 7F9h>        <1> times (0x13*2048)-($-$$) db 0
+    75                              <1> 
+    76                              <1> ; Boot catalog
+    77                              <1> iso_boot_catalog:
+    78                              <1> 
+    79                              <1> ; Validation entry
+    80                              <1> .validation:
+    81 00009800 01                  <1> db 1 ; Header ID
+    82 00009801 00                  <1> db 0 ; Platform ID (x86)
+    83 00009802 0000                <1> dw 0 ; Reserved
+    84 00009804 00<rep 18h>         <1> times 24 db 0 ; ID string
+    85 0000981C AA55                <1> dw 0x55aa ; Checksum
+    86 0000981E 55AA                <1> dw 0xaa55 ; Key
+    87                              <1> 
+    88                              <1> ; Default entry
+    89                              <1> .default:
+    90 00009820 88                  <1> db 0x88 ; Bootable
+    91 00009821 04                  <1> db 4 ; Hard drive emulation
+    92 00009822 0000                <1> dw 0 ; Load segment (0 is platform default)
+    93 00009824 EE                  <1> db 0xEE ; Partition type (0xEE is protective MBR)
+    94 00009825 00                  <1> db 0 ; Unused
+    95 00009826 0100                <1> dw 1 ; Sector count
+    96 00009828 00000000            <1> dd 0 ; Start address for virtual disk
+    97 0000982C 00<rep 14h>         <1> times 20 db 0 ; Padding
+    98                              <1> 
+    99                              <1> ; EFI section header entry
+   100                              <1> .efi_section_header:
+   101 00009840 91                  <1> db 0x91 ; Final header
+   102 00009841 EF                  <1> db 0xEF ; Platform ID (EFI)
+   103 00009842 0100                <1> dw 1 ; Number of section header entries
+   104 00009844 00<rep 1Ch>         <1> times 28 db 0 ; ID string
+   105                              <1> 
+   106                              <1> ; EFI section entry
+   107                              <1> .efi_section_entry:
+   108 00009860 88                  <1> db 0x88 ; Bootable
+   109 00009861 00                  <1> db 0 ; No emulation
+   110 00009862 0000                <1> dw 0 ; Load segment (0 is platform default)
+   111 00009864 00                  <1> db 0 ; Partition type (not used)
+   112 00009865 00                  <1> db 0 ; Unused
+   113 00009866 0002                <1> dw 512 ; Sector count (1 MiB = 512 CD sectors)
+   114 00009868 00020000            <1> dd 512 ; Start address for virtual disk (1 MiB = 512 CD sectors)
+   115 0000986C 00<rep 14h>         <1> times 20 db 0 ; Padding
+   116                              <1> 
+   117                              <1> ; Fill until CD sector 0x14
+   118 00009880 00<rep 780h>        <1> times (0x14*2048)-($-$$) db 0
+   119                              <1> 
+   120                              <1> iso_root_directory:
+   121                              <1> .self:
+   122 0000A000 22                  <1> db 0x22 ; Length of entry
+   123 0000A001 00                  <1> db 0x00 ; Length of extended attributes
+   124 0000A002 1400000000000014    <1> db 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14 ; Location of extent (0x14)
+   125 0000A00A 0008000000000800    <1> db 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00 ; Size of extent
+   126 0000A012 00000000000000      <1> db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ; Recording time
+   127 0000A019 02                  <1> db 0x02 ; File flags
+   128 0000A01A 00                  <1> db 0x00 ; Interleaved file unit size
+   129 0000A01B 00                  <1> db 0x00 ; Interleaved gap size
+   130 0000A01C 01000001            <1> db 0x01, 0x00, 0x00, 0x01 ; Volume sequence number
+   131 0000A020 01                  <1> db 0x01 ; Length of file identifier
+   132 0000A021 00                  <1> db 0x00 ; File identifier
+   133                              <1> 
+   134                              <1> .parent:
+   135 0000A022 22                  <1> db 0x22 ; Length of entry
+   136 0000A023 00                  <1> db 0x00 ; Length of extended attributes
+   137 0000A024 1400000000000014    <1> db 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14 ; Location of extent (0x14)
+   138 0000A02C 0008000000000800    <1> db 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00 ; Size of extent
+   139 0000A034 00000000000000      <1> db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ; Recording time
+   140 0000A03B 02                  <1> db 0x02 ; File flags
+   141 0000A03C 00                  <1> db 0x00 ; Interleaved file unit size
+   142 0000A03D 00                  <1> db 0x00 ; Interleaved gap size
+   143 0000A03E 01000001            <1> db 0x01, 0x00, 0x00, 0x01 ; Volume sequence number
+   144 0000A042 01                  <1> db 0x01 ; Length of file identifier
+   145 0000A043 01                  <1> db 0x01 ; File identifier
+   146                              <1> 
+   147                              <1> .boot_cat:
+   148 0000A044 2C                  <1> db 0x2C ; Length of entry
+   149 0000A045 00                  <1> db 0x00 ; Length of extended attributes
+   150 0000A046 1300000000000013    <1> db 0x13, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13 ; Location of extent (0x13)
+   151 0000A04E 0008000000000800    <1> db 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00 ; Size of extent
+   152 0000A056 00000000000000      <1> db 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 ; Recording time
+   153 0000A05D 00                  <1> db 0x00 ; File flags
+   154 0000A05E 00                  <1> db 0x00 ; Interleaved file unit size
+   155 0000A05F 00                  <1> db 0x00 ; Interleaved gap size
+   156 0000A060 01000001            <1> db 0x01, 0x00, 0x00, 0x01 ; Volume sequence number
+   157 0000A064 0A                  <1> db 0x0A ; Length of file identifier
+   158 0000A065 424F4F542E4341543B- <1> db "BOOT.CAT;1",0 ; File identifier
+   158 0000A06E 3100                <1>
+   159                              <1> 
+   160                              <1> ; Fill until CD sector 0x15
+   161 0000A070 00<rep 790h>        <1> times (0x15*2048)-($-$$) db 0
+    20                                  
+    21 0000A800 00<rep C00h>            times 3072 db 0 ; Pad to 0x13000
+    22                                  
+    23                                  ; stage3, loaded at 0x13000
+    24                                  stage3:
+    25                                      %defstr STAGE3_STR %[STAGE3]
+    26 0000B400 <bin 384C4h>                incbin STAGE3_STR
+    27 000438C4 00<rep 13Ch>                align 512, db 0
+    28                                  .end:
+    29                                  
+    30                                  ; the maximum size of the boot loader portion is 384 KiB
+    31 00043A00 00<rep 1C600h>          times (384*1024)-($-$$) db 0

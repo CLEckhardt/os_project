@@ -1,0 +1,11 @@
+/mnt/redox/cookbook/recipes/core/bootloader/target/x86_64-unknown-redox/build/target/x86-unknown-none/release/deps/libcipher-dc8657237e81472f.rmeta: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/block.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/common.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/errors.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/stream.rs
+
+/mnt/redox/cookbook/recipes/core/bootloader/target/x86_64-unknown-redox/build/target/x86-unknown-none/release/deps/libcipher-dc8657237e81472f.rlib: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/block.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/common.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/errors.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/stream.rs
+
+/mnt/redox/cookbook/recipes/core/bootloader/target/x86_64-unknown-redox/build/target/x86-unknown-none/release/deps/cipher-dc8657237e81472f.d: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/block.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/common.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/errors.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/stream.rs
+
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/lib.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/block.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/common.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/errors.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cipher-0.3.0/src/stream.rs:

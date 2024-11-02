@@ -1,0 +1,1 @@
+/mnt/redox/cookbook/recipes/core/zerod/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/zerod: /mnt/redox/cookbook/recipes/core/zerod/source/src/main.rs /mnt/redox/cookbook/recipes/core/zerod/source/src/scheme.rs

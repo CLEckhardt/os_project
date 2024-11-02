@@ -1,0 +1,53 @@
+[package]
+name = "redox_installer"
+version = "0.2.29"
+description = "A Redox filesystem builder"
+license = "MIT"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+repository = "https://gitlab.redox-os.org/redox-os/installer"
+default-run = "redox_installer"
+edition = "2021"
+
+[[bin]]
+name = "redox_installer"
+path = "src/bin/installer.rs"
+
+[[bin]]
+name = "redox_installer_tui"
+path = "src/bin/installer_tui.rs"
+
+[[bin]]
+name = "list_packages"
+path = "src/bin/list_packages.rs"
+
+[lib]
+name = "redox_installer"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0.89"
+arg_parser = "0.1.0"
+cc = "1"
+fatfs = "0.3.0"
+fscommon = "0.1.1"
+gpt = "3.0.0"
+libc = "0.2.70"
+pkgar = "0.1.15"
+pkgar-core = "0.1.13"
+pkgar-keys = "0.1.13"
+rand = "0.8"
+redox_liner = "0.5"
+redox-pkg = { version = "0.2.1", features = ["indicatif"] }
+redox_syscall = "0.5.2"
+redoxfs = "0.6.8"
+rust-argon2 = "0.8.2"
+serde = "=1.0.197"
+serde_derive = "1.0.110"
+termion = "4"
+toml = "0.8"
+uuid = { version = "1.4", features = ["v4"] }
+
+[patch.crates-io]
+cc-11 = { git = "https://github.com/tea/cc-rs", branch="riscv-abi-arch-fix", package = "cc" }
+# https://github.com/briansmith/ring/issues/1999
+ring = { git = "https://gitlab.redox-os.org/redox-os/ring.git", branch = "redox-0.17.8" }

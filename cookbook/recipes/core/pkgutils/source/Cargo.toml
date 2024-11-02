@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "pkg-lib",
+    "pkg-cli",
+]
+default-members = [
+    "pkg-cli",
+]
+
+[workspace.package]
+version = "0.2.1"
+description = "Redox Packaging Utilities"
+license = "MIT"
+authors = ["Jeremy Soller <jackpot51@gmail.com>"]
+repository = "https://gitlab.redox-os.org/redox-os/pkgutils"
+edition = "2021"
+
+[patch.crates-io]
+# https://github.com/briansmith/ring/issues/1999
+ring = { git = "https://gitlab.redox-os.org/redox-os/ring.git", branch = "redox-0.17.8" }
+cc-11 = { git = "https://github.com/tea/cc-rs", branch="riscv-abi-arch-fix", package = "cc" }

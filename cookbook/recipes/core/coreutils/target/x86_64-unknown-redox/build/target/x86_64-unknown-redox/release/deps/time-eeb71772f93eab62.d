@@ -1,0 +1,11 @@
+/mnt/redox/cookbook/recipes/core/coreutils/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/deps/libtime-eeb71772f93eab62.rmeta: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs
+
+/mnt/redox/cookbook/recipes/core/coreutils/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/deps/libtime-eeb71772f93eab62.rlib: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs
+
+/mnt/redox/cookbook/recipes/core/coreutils/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/deps/time-eeb71772f93eab62.d: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs
+
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/lib.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/display.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/duration.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/parse.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/time-0.1.45/src/sys.rs:

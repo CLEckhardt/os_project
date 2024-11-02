@@ -1,0 +1,17 @@
+target/
+/src/*/gen_table
+/build/
+/tmp/
+/busybox/
+/.vscode/
+/.vs/
+/public/
+*~
+.*.swp
+.*.swo
+.idea
+lib*.a
+/docs/_build
+*.iml
+### macOS ###
+.DS_Store

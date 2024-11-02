@@ -1,0 +1,10 @@
+/mnt/redox/cookbook/recipes/core/contain/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/deps/libthiserror-e93996add4dcc48b.rmeta: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/aserror.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/display.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/provide.rs
+
+/mnt/redox/cookbook/recipes/core/contain/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/deps/libthiserror-e93996add4dcc48b.rlib: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/aserror.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/display.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/provide.rs
+
+/mnt/redox/cookbook/recipes/core/contain/target/x86_64-unknown-redox/build/target/x86_64-unknown-redox/release/deps/thiserror-e93996add4dcc48b.d: /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/lib.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/aserror.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/display.rs /home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/provide.rs
+
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/lib.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/aserror.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/display.rs:
+/home/poduser/.cargo/registry/src/index.crates.io-6f17d22bba15001f/thiserror-1.0.50/src/provide.rs:
